@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 rootProject.name = "FilePicker"
 include(":pickercompose")
 include(":sharedsample")
+include(":supportlibrary")
