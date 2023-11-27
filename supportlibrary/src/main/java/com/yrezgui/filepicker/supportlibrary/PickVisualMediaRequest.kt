@@ -1,5 +1,13 @@
 package com.yrezgui.filepicker.supportlibrary
 
+/**
+ * Creates a request for a
+ * [androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia] or
+ * [androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia] Activity Contract.
+ *
+ * @param mediaType type to go into the PickVisualMediaRequest
+ * @return a PickVisualMediaRequest that contains the given input
+ */
 fun PickVisualMediaRequest(
     mediaType: PickVisualMedia.VisualMediaType = PickVisualMedia.ImageAndVideo
 ) = PickVisualMediaRequest.Builder().setMediaType(mediaType).build()
