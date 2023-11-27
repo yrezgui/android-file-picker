@@ -24,6 +24,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yrezgui.filepicker.pickercompose.ui.theme.PickerComposeTheme
+import com.yrezgui.filepicker.supportlibrary.PickVisualMedia
 import kotlinx.collections.immutable.persistentListOf
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -42,7 +43,7 @@ class PickerComposeActivity : ComponentActivity() {
         viewModel.updatePickerConfig(parseIntent() ?: return)
         val config = viewModel.state.pickerConfig
 
-        if (config.height != PickerConfig.FULL_SCREEN_HEIGHT && config.styleMode != PickerConfig.StyleMode.Modal) {
+        if (config.height != PickVisualMedia.FULL_SCREEN_HEIGHT && config.presentationMode != PickVisualMedia.ModalMode) {
             val params = window.attributes
             params.height = config.height
             params.gravity = Gravity.BOTTOM or Gravity.START or Gravity.END
@@ -56,7 +57,7 @@ class PickerComposeActivity : ComponentActivity() {
             val gridEntries by viewModel.dataSource.collectAsStateWithLifecycle(initialValue = persistentListOf())
 
             val modifier =
-                if (config.height != PickerConfig.FULL_SCREEN_HEIGHT && config.styleMode != PickerConfig.StyleMode.Modal) {
+                if (config.height != PickVisualMedia.FULL_SCREEN_HEIGHT && config.presentationMode != PickVisualMedia.ModalMode) {
                     Modifier
                         .padding(top = 5.dp)
                         .height(config.height.dp)
@@ -79,8 +80,8 @@ class PickerComposeActivity : ComponentActivity() {
                             )
                         }
 
-                        when (config.styleMode) {
-                            PickerConfig.StyleMode.Modal -> {
+                        when (config.presentationMode) {
+                            PickVisualMedia.ModalMode -> {
                                 ModalMediaGrid(
                                     entries = gridEntries,
                                     selectedUris = state.selectedUris,
@@ -88,7 +89,7 @@ class PickerComposeActivity : ComponentActivity() {
                                 )
                             }
 
-                            PickerConfig.StyleMode.Inline -> {
+                            PickVisualMedia.InlineMode -> {
                                 VisualMediaGrid(
                                     entries = gridEntries,
                                     selectedUris = state.selectedUris,
@@ -96,7 +97,7 @@ class PickerComposeActivity : ComponentActivity() {
                                 )
                             }
 
-                            PickerConfig.StyleMode.Carousel -> {
+                            PickVisualMedia.CarouselMode -> {
                                 CarouselMediaGrid(
                                     entries = gridEntries,
                                     selectedUris = state.selectedUris,
@@ -125,10 +126,10 @@ class PickerComposeActivity : ComponentActivity() {
 
     private fun parseIntent(): PickerConfig? {
         Log.d("parseIntent", intent.toString())
-        if (intent.action != PickerConfig.ACTION) {
+        if (intent.action != PickVisualMedia.FILE_PICKER_INTENT) {
             Log.e(
                 "parseIntent",
-                "Wrong action (expected ${PickerConfig.ACTION} | received ${intent.action}"
+                "Wrong action (expected ${PickVisualMedia.FILE_PICKER_INTENT} | received ${intent.action}"
             )
             return null
         }
@@ -151,24 +152,31 @@ class PickerComposeActivity : ComponentActivity() {
         } else {
             Log.d("preselectedUris", intent.getClipDataUris().toString())
             pickerConfig = pickerConfig.copy(
-                styleMode = PickerConfig.StyleMode.values()[extras.getInt(
-                    PickerConfig.ExtraOption.StyleMode.id,
-                    0
-                )],
-                selectionMode = PickerConfig.SelectionMode.values()[extras.getInt(
-                    PickerConfig.ExtraOption.SelectionMode.id,
-                    0
-                )],
+                selectionMode = when (extras.getString(PickVisualMedia.EXTRA_SELECTION_MODE)) {
+                    PickVisualMedia.Unordered.id -> PickVisualMedia.Unordered
+                    PickVisualMedia.Ordered.id -> PickVisualMedia.Ordered
+                    PickVisualMedia.ContinuousUnordered.id -> PickVisualMedia.ContinuousUnordered
+                    PickVisualMedia.ContinuousOrdered.id -> PickVisualMedia.ContinuousOrdered
+                    else -> PickVisualMedia.Unordered
+                },
+                presentationMode = when (extras.getString(PickVisualMedia.EXTRA_PRESENTATION_MODE)) {
+                    PickVisualMedia.ModalMode.id -> PickVisualMedia.ModalMode
+                    PickVisualMedia.InlineMode.id -> PickVisualMedia.InlineMode
+                    PickVisualMedia.CarouselMode.id -> PickVisualMedia.CarouselMode
+                    else -> PickVisualMedia.ModalMode
+                },
                 height = extras.getInt(
-                    PickerConfig.ExtraOption.Height.id,
-                    PickerConfig.FULL_SCREEN_HEIGHT
+                    PickVisualMedia.EXTRA_HEIGHT,
+                    PickVisualMedia.FULL_SCREEN_HEIGHT
                 ),
-                showToolbar = extras.getBoolean(PickerConfig.ExtraOption.ShowToolbar.id),
+                showToolbar = extras.getBoolean(PickVisualMedia.EXTRA_SHOW_TOOLBAR),
+                cameraSupport = extras.getBoolean(PickVisualMedia.EXTRA_CAMERA_SUPPORT),
                 preSelectedUris = intent.getClipDataUris()
             )
         }
 
 
+        Log.d("parseIntent|extras", intent.extras.toString())
         Log.d("parseIntent|successful", pickerConfig.toString())
 
         return pickerConfig

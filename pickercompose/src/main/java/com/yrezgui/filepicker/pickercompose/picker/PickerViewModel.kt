@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.yrezgui.filepicker.supportlibrary.PickVisualMedia
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.shareIn
 
@@ -67,7 +68,7 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
     fun prepareReturnedIntent(): Intent {
         val selectedUris = state.selectedUris.toList()
 
-        val intent = Intent(PickerConfig.RESULT_ACTION).apply {
+        val intent = Intent(PickVisualMedia.FILE_PICKER_INTENT).apply {
             setPackage(state.pickerConfig.referrer)
         }
 

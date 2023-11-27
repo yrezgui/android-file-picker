@@ -2,6 +2,7 @@ package com.yrezgui.filepicker.supportlibrary
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.ext.SdkExtensions
 import android.provider.MediaStore
+import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.annotation.CallSuper
 import androidx.annotation.RequiresApi
@@ -41,6 +43,7 @@ open class PickVisualMedia : ActivityResultContract<PickVisualMediaRequest, Uri?
             return isSystemPickerAvailable()
         }
 
+
         /**
          * In cases where the system framework provided [MediaStore.ACTION_PICK_IMAGES]
          * Photo Picker cannot be implemented, OEMs or system apps can provide a consistent
@@ -54,7 +57,8 @@ open class PickVisualMedia : ActivityResultContract<PickVisualMediaRequest, Uri?
          * Note: this should not be used directly, instead relying on the selection logic
          * done by [createIntent] to create the correct Intent for the current device.
          */
-        @Suppress("ActionValue") /* Don't include SYSTEM_FALLBACK in the action */
+        @Suppress("ActionValue")
+        /* Don't include SYSTEM_FALLBACK in the action */
         const val ACTION_SYSTEM_FALLBACK_PICK_IMAGES =
             "androidx.activity.result.contract.action.PICK_IMAGES"
 
@@ -68,7 +72,8 @@ open class PickVisualMedia : ActivityResultContract<PickVisualMediaRequest, Uri?
          * If this extra is present but equal to [Int.MAX_VALUE], then no limit should
          * be enforced.
          */
-        @Suppress("ActionValue") /* Don't include SYSTEM_FALLBACK in the extra */
+        @Suppress("ActionValue")
+        /* Don't include SYSTEM_FALLBACK in the extra */
         const val EXTRA_SYSTEM_FALLBACK_PICK_IMAGES_MAX =
             "androidx.activity.result.contract.extra.PICK_IMAGES_MAX"
 
@@ -138,72 +143,154 @@ open class PickVisualMedia : ActivityResultContract<PickVisualMediaRequest, Uri?
             )
         }
 
-        internal fun getVisualMimeType(input: VisualMediaType): String? {
-            return when (input) {
-                is ImageOnly -> "image/*"
-                is VideoOnly -> "video/*"
-                is SingleMimeType -> input.mimeType
-                is ImageAndVideo -> null
-            }
+        // TODO(yrezgui): Remove this function as it shouldn't be part of ActivityX
+        internal fun isCustomFilePickerAvailable(context: Context): Boolean {
+            return true
+            return context.packageManager.resolveActivity(
+                Intent(FILE_PICKER_INTENT),
+                PackageManager.MATCH_DEFAULT_ONLY
+            ) != null
         }
+
+        // TODO(yrezgui): Remove this constant as it shouldn't be part of ActivityX
+        const val FILE_PICKER_INTENT = "universal.OPEN_PICKER"
+
+
+        // TODO(yrezgui): Remove this constant as it shouldn't be part of ActivityX
+        const val FULL_SCREEN_HEIGHT = -1
+
+        // TODO(yrezgui): Remove these constants as they shouldn't be part of ActivityX
+        const val EXTRA_SELECTION_MODE = "selection_mode"
+        const val EXTRA_PRESENTATION_MODE = "presentation_mode"
+        const val EXTRA_HEIGHT = "height"
+        const val EXTRA_SHOW_TOOLBAR = "show_toolbar"
+        const val EXTRA_CAMERA_SUPPORT = "camera_support"
     }
 
     /**
      * Represents filter input type accepted by the photo picker.
      */
-    sealed interface VisualMediaType
+    sealed interface VisualMediaType {
+        val mimeType: String
+    }
 
     /**
      * [VisualMediaType] object used to filter images only when using the photo picker.
      */
-    object ImageOnly : VisualMediaType
+    object ImageOnly : VisualMediaType {
+        override val mimeType = "image/*"
+    }
 
     /**
      * [VisualMediaType] object used to filter video only when using the photo picker.
      */
-    object VideoOnly : VisualMediaType
+    object VideoOnly : VisualMediaType {
+        override val mimeType = "video/*"
+    }
 
     /**
      * [VisualMediaType] object used to filter images and video when using the photo picker.
      */
-    object ImageAndVideo : VisualMediaType
+    object ImageAndVideo : VisualMediaType {
+        override val mimeType = "*/*"
+    }
 
     /**
      * [VisualMediaType] class used to filter a single mime type only when using the photo
      * picker.
      */
-    class SingleMimeType(val mimeType: String) : VisualMediaType
+    class SingleMimeType(override val mimeType: String) : VisualMediaType
+
+    // TODO(yrezgui): Remove the interface & objects as they shouldn't be part of ActivityX
+    sealed interface PresentationMode {
+        val id: String
+    }
+
+    object ModalMode : PresentationMode {
+        override val id = "modal"
+    }
+
+    object InlineMode : PresentationMode {
+        override val id = "inline"
+    }
+
+    object CarouselMode : PresentationMode {
+        override val id = "carousel"
+    }
+
+
+    // TODO(yrezgui): Remove the interface & objects as they shouldn't be part of ActivityX
+    sealed interface SelectionMode {
+        val id: String
+    }
+
+    object Unordered : SelectionMode {
+        override val id = "unordered"
+    }
+
+    object Ordered : SelectionMode {
+        override val id = "ordered"
+    }
+
+    object ContinuousUnordered : SelectionMode {
+        override val id = "continuous_unordered"
+    }
+
+    object ContinuousOrdered : SelectionMode {
+        override val id = "continuous_ordered"
+    }
 
     @CallSuper
     override fun createIntent(context: Context, input: PickVisualMediaRequest): Intent {
         // Check if Photo Picker is available on the device
-        return if (isSystemPickerAvailable()) {
+        return if (isCustomFilePickerAvailable(context)) {
+            Intent(FILE_PICKER_INTENT).apply {
+                type = input.mediaType.mimeType
+
+                putExtra(EXTRA_SELECTION_MODE, input.selectionMode.id)
+                putExtra(EXTRA_PRESENTATION_MODE, input.presentationMode.id)
+                putExtra(EXTRA_HEIGHT, input.height)
+                putExtra(EXTRA_SHOW_TOOLBAR, input.showToolbar)
+                putExtra(EXTRA_CAMERA_SUPPORT, input.cameraSupport)
+
+                if (input.preSelectedUris.isNotEmpty()) {
+                    clipData = ClipData(
+                        null /* label */,
+                        arrayOf("image/*", "video/*"),
+                        ClipData.Item(input.preSelectedUris[0])
+                    ).apply {
+                        for (i in 1 until input.preSelectedUris.size) {
+                            addItem(ClipData.Item(input.preSelectedUris[i]))
+                        }
+                    }
+                }
+            }
+        } else if (isSystemPickerAvailable()) {
             Intent(MediaStore.ACTION_PICK_IMAGES).apply {
-                type = getVisualMimeType(input.mediaType)
+                type = input.mediaType.mimeType
             }
         } else if (isSystemFallbackPickerAvailable(context)) {
             val fallbackPicker = checkNotNull(getSystemFallbackPicker(context)).activityInfo
             Intent(ACTION_SYSTEM_FALLBACK_PICK_IMAGES).apply {
                 setClassName(fallbackPicker.applicationInfo.packageName, fallbackPicker.name)
-                type = getVisualMimeType(input.mediaType)
+                type = input.mediaType.mimeType
             }
         } else if (isGmsPickerAvailable(context)) {
             val gmsPicker = checkNotNull(getGmsPicker(context)).activityInfo
             Intent(GMS_ACTION_PICK_IMAGES).apply {
                 setClassName(gmsPicker.applicationInfo.packageName, gmsPicker.name)
-                type = getVisualMimeType(input.mediaType)
+                type = input.mediaType.mimeType
             }
         } else {
             // For older devices running KitKat and higher and devices running Android 12
             // and 13 without the SDK extension that includes the Photo Picker, rely on the
             // ACTION_OPEN_DOCUMENT intent
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                type = getVisualMimeType(input.mediaType)
+                type = input.mediaType.mimeType
 
-                if (type == null) {
+                if (type == "*/*") {
                     // ACTION_OPEN_DOCUMENT requires to set this parameter when launching the
                     // intent with multiple mime types
-                    type = "*/*"
                     putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
                 }
             }
@@ -270,10 +357,40 @@ open class PickMultipleVisualMedia(
     @CallSuper
     @SuppressLint("NewApi", "ClassVerificationFailure")
     override fun createIntent(context: Context, input: PickVisualMediaRequest): Intent {
+        val act = context.packageManager.resolveActivity(
+            Intent(PickVisualMedia.FILE_PICKER_INTENT),
+            PackageManager.MATCH_DEFAULT_ONLY
+        )
+
+        Log.d("Resolve", act.toString())
+
         // Check to see if the photo picker is available
-        return if (PickVisualMedia.isSystemPickerAvailable()) {
+        return if (PickVisualMedia.isCustomFilePickerAvailable(context)) {
+            Intent(PickVisualMedia.FILE_PICKER_INTENT).apply {
+                type = input.mediaType.mimeType
+
+                putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, maxItems)
+                putExtra(PickVisualMedia.EXTRA_SELECTION_MODE, input.selectionMode.id)
+                putExtra(PickVisualMedia.EXTRA_PRESENTATION_MODE, input.presentationMode.id)
+                putExtra(PickVisualMedia.EXTRA_HEIGHT, input.height)
+                putExtra(PickVisualMedia.EXTRA_SHOW_TOOLBAR, input.showToolbar)
+                putExtra(PickVisualMedia.EXTRA_CAMERA_SUPPORT, input.cameraSupport)
+
+                if (input.preSelectedUris.isNotEmpty()) {
+                    clipData = ClipData(
+                        null /* label */,
+                        arrayOf("image/*", "video/*"),
+                        ClipData.Item(input.preSelectedUris[0])
+                    ).apply {
+                        for (i in 1 until input.preSelectedUris.size) {
+                            addItem(ClipData.Item(input.preSelectedUris[i]))
+                        }
+                    }
+                }
+            }
+        } else if (PickVisualMedia.isSystemPickerAvailable()) {
             Intent(MediaStore.ACTION_PICK_IMAGES).apply {
-                type = PickVisualMedia.getVisualMimeType(input.mediaType)
+                type = input.mediaType.mimeType
                 require(maxItems <= MediaStore.getPickImagesMaxLimit()) {
                     "Max items must be less or equals MediaStore.getPickImagesMaxLimit()"
                 }
@@ -284,13 +401,14 @@ open class PickMultipleVisualMedia(
             val fallbackPicker = checkNotNull(getSystemFallbackPicker(context)).activityInfo
             Intent(ACTION_SYSTEM_FALLBACK_PICK_IMAGES).apply {
                 setClassName(fallbackPicker.applicationInfo.packageName, fallbackPicker.name)
-                type = PickVisualMedia.getVisualMimeType(input.mediaType)
+                type = input.mediaType.mimeType
                 putExtra(GMS_EXTRA_PICK_IMAGES_MAX, maxItems)
             }
         } else if (PickVisualMedia.isGmsPickerAvailable(context)) {
             val gmsPicker = checkNotNull(getGmsPicker(context)).activityInfo
             Intent(GMS_ACTION_PICK_IMAGES).apply {
                 setClassName(gmsPicker.applicationInfo.packageName, gmsPicker.name)
+                type = input.mediaType.mimeType
                 putExtra(GMS_EXTRA_PICK_IMAGES_MAX, maxItems)
             }
         } else {
@@ -298,13 +416,12 @@ open class PickMultipleVisualMedia(
             // and 13 without the SDK extension that includes the Photo Picker, rely on the
             // ACTION_OPEN_DOCUMENT intent
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                type = PickVisualMedia.getVisualMimeType(input.mediaType)
+                type = input.mediaType.mimeType
                 putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
 
-                if (type == null) {
+                if (type == "*/*") {
                     // ACTION_OPEN_DOCUMENT requires to set this parameter when launching the
                     // intent with multiple mime types
-                    type = "*/*"
                     putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
                 }
             }

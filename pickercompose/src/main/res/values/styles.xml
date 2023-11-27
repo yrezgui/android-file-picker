@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <style name="OverlayTheme" parent="android:Theme.Light">
         <item name="android:backgroundDimEnabled">false</item>
         <item name="android:navigationBarColor">@android:color/white</item>
